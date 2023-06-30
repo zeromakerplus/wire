@@ -46,11 +46,11 @@ if __name__ == '__main__':
     
     # Read image and scale. A scale of 0.5 for parrot image ensures that it
     # fits in a 12GB GPU
-    im = utils.normalize(plt.imread('data/parrot.png').astype(np.float32), True)
-    im = cv2.resize(im, None, fx=1/4, fy=1/4, interpolation=cv2.INTER_AREA)
-    # im = io.loadmat('./data/spectral_img.mat')
-    # im = im['img'].astype(np.float32())
-    # im = im / np.max(im)
+    # im = utils.normalize(plt.imread('data/parrot.png').astype(np.float32), True)
+    # im = cv2.resize(im, None, fx=1/4, fy=1/4, interpolation=cv2.INTER_AREA)
+    im = io.loadmat('./data/spectral_img.mat')
+    im = im['img'].astype(np.float32())
+    im = im / np.max(im)
     H, W, L = im.shape
     a = 1
     
