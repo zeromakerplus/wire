@@ -191,7 +191,7 @@ if __name__ == '__main__':
         #     mse_array[idx] = volutils.get_IoU(im_estim, imten, mcubes_thres)
         # else:
         mse_array[idx] = train_loss/nchunks
-        print(mse_array[idx])
+        # print(mse_array[idx])
         time_array[idx] = time.time()
         scheduler.step()
         
