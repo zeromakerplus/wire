@@ -114,12 +114,17 @@ if __name__ == '__main__':
     
     rec = torch.zeros_like(gt)
 
-    # random_indices = torch.randperm(H*W)[0:H*W]
+
+    # num_train = int(H*W*0.1)
+    # random_indices = torch.randperm(H*W)[0:]
     
     tbar = tqdm(range(niters))
     init_time = time.time()
     for epoch in tbar:
+        
         indices = torch.randperm(H*W)
+        # indices = random_indices[0:num_train]
+
         
         for b_idx in range(0, H*W, maxpoints):
             b_indices = indices[b_idx:min(H*W, b_idx+maxpoints)]
