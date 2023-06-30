@@ -26,10 +26,10 @@ from modules import volutils
 
 if __name__ == '__main__':
     nonlin = 'wire' # type of nonlinearity, 'wire', 'siren', 'mfn', 'relu', 'posenc', 'gauss'
-    niters = 200                # Number of SGD iterations
+    niters = 2000                # Number of SGD iterations
     learning_rate = 5e-3        # Learning rate 
     expname = 'thai_statue'     # Volume to load
-    scale = 0.2                 # Run at lower scales to testing, default 1.0
+    scale = 1.0                 # Run at lower scales to testing, default 1.0
     mcubes_thres = 0.5          # Threshold for marching cubes
     
     # Gabor filter constants
@@ -48,22 +48,79 @@ if __name__ == '__main__':
         occupancy = False
     
     # Load image and scale
-    im = io.loadmat('data/%s.mat'%expname)['hypercube'].astype(np.float32)
-    im = ndimage.zoom(im/im.max(), [scale, scale, scale], order=0)
+    # im = io.loadmat('data/%s.mat'%expname)['hypercube'].astype(np.float32)
+
+    depth = cv2.imread('./data/depth.hdr', flags=cv2.IMREAD_ANYDEPTH)
+    depth = depth[:,:,0]
+    depth = depth - 5
+
+
+    spetcral_img = io.loadmat('data/chrac_spectral.mat')['img'].astype(np.float32)
+    depth = ndimage.zoom(depth, [0.1,0.1], order=0)
+    spetcral_img = ndimage.zoom(spetcral_img, [0.1,0.1,1.0], order=0)
+
+    N = depth.shape[0]
+    L = spetcral_img.shape[2]
+    im = np.zeros([N,N,N,L]).astype(np.float32())
+    x = np.linspace(-1,1,N)
+    y = np.linspace(-1,1,N)
+    z = np.linspace(-1,1,N)
+    for i in range(N):
+        for j in range(N):
+            ind = int((depth[i,j] - z[0]) / (z[1] - z[0]))
+            ind = ind if ind < N else N-1
+            ind = ind if ind > 0 else 0
+            if depth[i,j] < 0.9:
+                im[i,j,ind] = spetcral_img[i,j,:]
+
+
+    im = ndimage.zoom(im/im.max(), [scale, scale, scale, 1.0], order=0)
+
     
     # If the volume is an occupancy, clip to tightest bounding box
     if occupancy:
-        hidx, widx, tidx = np.where(im > 0.99)
+        hidx, widx, tidx = np.where(np.sum(im, axis = 3) > 0.001)
         im = im[hidx.min():hidx.max(),
                 widx.min():widx.max(),
-                tidx.min():tidx.max()]
+                tidx.min():tidx.max(), :]
     
     print(im.shape)
-    H, W, T = im.shape
+    H, W, T, L = im.shape
+
+    x = np.linspace(-1,1,H)
+    y = np.linspace(-1,1,W)
+    z = np.linspace(-1,1,T)
+    colors = np.reshape(im,[H*W*T,L])
+    inds = np.sum(colors, axis = 1) > 0.01
+    out_inds = np.sum(colors, axis = 1) <= 0.01
+    colors = colors[inds,:]
+
+    [X,Y,Z] = np.meshgrid(x,y,z,indexing='ij')
+    points = np.stack((X,Y,Z), axis = 3)
+    points = np.reshape(points, [H*W*T, 3])
+    points = points[inds,:]
+
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111, projection='3d')
+    # ax.scatter(points[:,0], points[:,1], points[:,2], c=colors[:,[26,16,6]], marker='o')
+    # # ax.set_xlim(-0.5,0.5)
+    # # ax.set_ylim(-0.5,0.5)
+    # # ax.set_zlim(0,1)
+    # ax.set_xlabel('X')
+    # ax.set_ylabel('Y')
+    # ax.set_zlabel('Z')
+    # plt.show()
+
+
+    im = im / np.mean(colors) * 1
+
+    # im = im.sum(axis = 3)
+    # im[im > 0.001] = 1
+    # L = 1
     
     maxpoints = min(H*W*T, maxpoints)
         
-    imten = torch.tensor(im).cuda().reshape(H*W*T, 1)
+    imten = torch.tensor(im).cuda().reshape(H*W*T, L)
     
     if nonlin == 'posenc':
         nonlin = 'relu'
@@ -75,7 +132,7 @@ if __name__ == '__main__':
     model = models.get_INR(
                     nonlin=nonlin,
                     in_features=3,
-                    out_features=1, 
+                    out_features=L, 
                     hidden_features=hidden_features,
                     hidden_layers=hidden_layers,
                     first_omega_0=omega0,
@@ -102,7 +159,7 @@ if __name__ == '__main__':
 
     tbar = tqdm.tqdm(range(niters))
     
-    im_estim = torch.zeros((H*W*T, 1), device='cuda')
+    im_estim = torch.zeros((H*W*T, L), device='cuda')
     
     tic = time.time()
     print('Running %s nonlinearity'%nonlin)
@@ -115,7 +172,7 @@ if __name__ == '__main__':
             b_indices = indices[b_idx:min(H*W*T, b_idx+maxpoints)]
             b_coords = coords[b_indices, ...].cuda()
             b_indices = b_indices.cuda()
-            pixelvalues = model(b_coords[None, ...]).squeeze()[:, None]
+            pixelvalues = model(b_coords[None, ...]).squeeze(axis = 0)
             
             with torch.no_grad():
                 im_estim[b_indices, :] = pixelvalues
@@ -130,31 +187,38 @@ if __name__ == '__main__':
             train_loss += lossval
             nchunks += 1
 
-        if occupancy:
-            mse_array[idx] = volutils.get_IoU(im_estim, imten, mcubes_thres)
-        else:
-            mse_array[idx] = train_loss/nchunks
+        # if occupancy:
+        #     mse_array[idx] = volutils.get_IoU(im_estim, imten, mcubes_thres)
+        # else:
+        mse_array[idx] = train_loss/nchunks
+        print(mse_array[idx])
         time_array[idx] = time.time()
         scheduler.step()
         
-        im_estim_vol = im_estim.reshape(H, W, T)
+        im_estim_vol = im_estim.reshape(H, W, T, L)
         
         if lossval < best_mse:
             best_mse = lossval
             best_img = copy.deepcopy(im_estim)
 
-        if sys.platform == 'win32':
-            cv2.imshow('GT', im[..., idx%T])
-            cv2.imshow('Estim', im_estim_vol[..., idx%T].detach().cpu().numpy())
-            cv2.waitKey(1)
+        # if sys.platform == 'win32':
+        #     cv2.imshow('GT', im[..., idx%T])
+        #     cv2.imshow('Estim', im_estim_vol[..., idx%T].detach().cpu().numpy())
+        #     cv2.waitKey(1)
         
-        tbar.set_description('%.4e'%mse_array[idx])
+        # tbar.set_description('%.4e'%mse_array[idx])
+        # tbar.refresh()
+        # psnrval = -10*np.log10(mse_array[idx])
+        # tbar.set_description('%.1f'%psnrval)
+        # tbar.refresh()
+        positive_psnrval = -10*torch.log10(torch.mean((imten - im_estim) ** 2) / torch.max(imten))
+        tbar.set_description('%.1f'%positive_psnrval)
         tbar.refresh()
         
     total_time = time.time() - tic
     nparams = utils.count_parameters(model)
     
-    best_img = best_img.reshape(H, W, T).detach().cpu().numpy()
+    best_img = best_img.reshape(H, W, T, L).detach().cpu().numpy()
     
     if posencode:
         nonlin = 'posenc'
@@ -167,20 +231,25 @@ if __name__ == '__main__':
     mse_array = mse_array[indices]
     
     mdict = {'mse_array': mse_array,
+             'best_img': best_img,
+             'img': im,
              'time_array': time_array-time_array[0],
              'nparams': utils.count_parameters(model)}
     io.savemat('results/%s/%s.mat'%(expname, nonlin), mdict)
     
     # Generate a mesh with marching cubes if it is an occupancy volume
-    if occupancy:
-        savename = 'results/%s/%s.dae'%(expname, nonlin)
-        volutils.march_and_save(best_img, mcubes_thres, savename, True)
+    # if occupancy:
+    #     savename = 'results/%s/%s.dae'%(expname, nonlin)
+    #     volutils.march_and_save(best_img, mcubes_thres, savename, True)
     
     print('Total time %.2f minutes'%(total_time/60))
-    if occupancy:
-        print('IoU: ', volutils.get_IoU(best_img, im, mcubes_thres))
-    else:
-        print('PSNR: ', utils.psnr(im, best_img))
+    # if occupancy:
+    #     print('IoU: ', volutils.get_IoU(best_img, im, mcubes_thres))
+    # else:
+    # print('PSNR: ', utils.psnr(im, best_img))
+
+
+    print('PSNR: ', 10*np.log10(np.max(im) / np.mean((im - best_img) ** 2)))
     print('Total pararmeters: %.2f million'%(nparams/1e6))
     
     

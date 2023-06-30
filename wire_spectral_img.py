@@ -46,9 +46,12 @@ if __name__ == '__main__':
     
     # Read image and scale. A scale of 0.5 for parrot image ensures that it
     # fits in a 12GB GPU
-    im = utils.normalize(plt.imread('data/parrot.png').astype(np.float32), True)
-    im = cv2.resize(im, None, fx=1/4, fy=1/4, interpolation=cv2.INTER_AREA)
-    H, W, _ = im.shape
+    # im = utils.normalize(plt.imread('data/parrot.png').astype(np.float32), True)
+    # im = cv2.resize(im, None, fx=1/4, fy=1/4, interpolation=cv2.INTER_AREA)
+    im = io.loadmat('./data/spectral_img.mat')
+    im = im['img'].astype(np.float32())
+    im = im / np.max(im)
+    H, W, L = im.shape
     
     # Create a noisy image
     im_noisy = utils.measure(im, noise_snr, tau)
@@ -70,7 +73,7 @@ if __name__ == '__main__':
     model = models.get_INR(
                     nonlin=nonlin,
                     in_features=2,
-                    out_features=3, 
+                    out_features=L, 
                     hidden_features=hidden_features,
                     hidden_layers=hidden_layers,
                     first_omega_0=omega0,
@@ -98,8 +101,8 @@ if __name__ == '__main__':
     X, Y = torch.meshgrid(x, y, indexing='xy')
     coords = torch.hstack((X.reshape(-1, 1), Y.reshape(-1, 1)))[None, ...]
     
-    gt = torch.tensor(im).cuda().reshape(H*W, 3)[None, ...]
-    gt_noisy = torch.tensor(im_noisy).cuda().reshape(H*W, 3)[None, ...]
+    gt = torch.tensor(im).cuda().reshape(H*W, L)[None, ...]
+    gt_noisy = torch.tensor(im_noisy).cuda().reshape(H*W, L)[None, ...]
     
     mse_array = torch.zeros(niters, device='cuda')
     mse_loss_array = torch.zeros(niters, device='cuda')
@@ -109,6 +112,8 @@ if __name__ == '__main__':
     best_img = None
     
     rec = torch.zeros_like(gt)
+
+    random_indices = torch.randperm(H*W)[0:4096]
     
     tbar = tqdm(range(niters))
     init_time = time.time()
@@ -124,7 +129,8 @@ if __name__ == '__main__':
             with torch.no_grad():
                 rec[:, b_indices, :] = pixelvalues
     
-            loss = ((pixelvalues - gt_noisy[:, b_indices, :])**2).mean() 
+            # loss = ((pixelvalues - gt_noisy[:, b_indices, :])**2).mean() 
+            loss = ((pixelvalues[:, random_indices, :] - gt_noisy[:, b_indices, :][:, random_indices, :])**2).mean() 
             
             optim.zero_grad()
             loss.backward()
@@ -135,8 +141,8 @@ if __name__ == '__main__':
         with torch.no_grad():
             mse_loss_array[epoch] = ((gt_noisy - rec)**2).mean().item()
             mse_array[epoch] = ((gt - rec)**2).mean().item()
-            im_gt = gt.reshape(H, W, 3).permute(2, 0, 1)[None, ...]
-            im_rec = rec.reshape(H, W, 3).permute(2, 0, 1)[None, ...]
+            im_gt = gt.reshape(H, W, L).permute(2, 0, 1)[None, ...]
+            im_rec = rec.reshape(H, W, L).permute(2, 0, 1)[None, ...]
         
             psnrval = -10*torch.log10(mse_array[epoch])
             tbar.set_description('%.1f'%psnrval)
@@ -144,10 +150,10 @@ if __name__ == '__main__':
         
         scheduler.step()
         
-        imrec = rec[0, ...].reshape(H, W, 3).detach().cpu().numpy()
+        imrec = rec[0, ...].reshape(H, W, L).detach().cpu().numpy()
             
-        cv2.imshow('Reconstruction', imrec[..., ::-1])            
-        cv2.waitKey(1)
+        # cv2.imshow('Reconstruction', imrec[..., ::-1])            
+        # cv2.waitKey(1)
     
         if (mse_array[epoch] < best_mse) or (epoch == 0):
             best_mse = mse_array[epoch]
