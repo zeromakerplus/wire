@@ -52,6 +52,7 @@ if __name__ == '__main__':
     # im = im['img'].astype(np.float32())
     # im = im / np.max(im)
     H, W, L = im.shape
+    a = 1
     
     # Create a noisy image
     im_noisy = utils.measure(im, noise_snr, tau)
