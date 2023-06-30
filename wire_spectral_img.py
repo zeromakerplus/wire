@@ -46,11 +46,11 @@ if __name__ == '__main__':
     
     # Read image and scale. A scale of 0.5 for parrot image ensures that it
     # fits in a 12GB GPU
-    # im = utils.normalize(plt.imread('data/parrot.png').astype(np.float32), True)
-    # im = cv2.resize(im, None, fx=1/4, fy=1/4, interpolation=cv2.INTER_AREA)
-    im = io.loadmat('./data/spectral_img.mat')
-    im = im['img'].astype(np.float32())
-    im = im / np.max(im)
+    im = utils.normalize(plt.imread('data/parrot.png').astype(np.float32), True)
+    im = cv2.resize(im, None, fx=1/4, fy=1/4, interpolation=cv2.INTER_AREA)
+    # im = io.loadmat('./data/spectral_img.mat')
+    # im = im['img'].astype(np.float32())
+    # im = im / np.max(im)
     H, W, L = im.shape
     
     # Create a noisy image
@@ -113,7 +113,7 @@ if __name__ == '__main__':
     
     rec = torch.zeros_like(gt)
 
-    random_indices = torch.randperm(H*W)[0:4096]
+    # random_indices = torch.randperm(H*W)[0:H*W]
     
     tbar = tqdm(range(niters))
     init_time = time.time()
@@ -129,8 +129,8 @@ if __name__ == '__main__':
             with torch.no_grad():
                 rec[:, b_indices, :] = pixelvalues
     
-            # loss = ((pixelvalues - gt_noisy[:, b_indices, :])**2).mean() 
-            loss = ((pixelvalues[:, random_indices, :] - gt_noisy[:, b_indices, :][:, random_indices, :])**2).mean() 
+            loss = ((pixelvalues - gt_noisy[:, b_indices, :])**2).mean() 
+            # loss = ((pixelvalues[:, random_indices, :] - gt_noisy[:, b_indices, :][:, random_indices, :])**2).mean() 
             
             optim.zero_grad()
             loss.backward()
