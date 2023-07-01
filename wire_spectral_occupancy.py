@@ -65,12 +65,13 @@ if __name__ == '__main__':
     depth = depth / np.max(depth) * 2 - 1 + 0.1
 
 
-    spetcral_img = io.loadmat('data/chrac_spectral.mat')['img'].astype(np.float32)
+    spectral_img = io.loadmat('data/chrac_spectral.mat')['img'].astype(np.float32)
+    spectral_img = spectral_img[:,:,[26,16,6]]
     depth = ndimage.zoom(depth, [0.1,0.1], order=0, mode='nearest')
-    spetcral_img = ndimage.zoom(spetcral_img, [0.1,0.1,1.0], order=0, mode='nearest')
+    spectral_img = ndimage.zoom(spectral_img, [0.1,0.1,1.0], order=0, mode='nearest')
 
     N = depth.shape[0]
-    L = spetcral_img.shape[2]
+    L = spectral_img.shape[2]
     im = np.zeros([N,N,N,L]).astype(np.float32())
     x = np.linspace(-1,1,N)
     y = np.linspace(-1,1,N)
@@ -81,18 +82,18 @@ if __name__ == '__main__':
             ind = ind if ind < N else N-1
             ind = ind if ind > 0 else 0
             if depth[i,j] < 1.0:
-                im[i,j,ind] = spetcral_img[i,j,:]
+                im[i,j,ind] = spectral_img[i,j,:]
 
 
     im = ndimage.zoom(im/im.max(), [scale, scale, scale, 1.0], order=0,mode='nearest')
 
     
     # If the volume is an occupancy, clip to tightest bounding box
-    if occupancy:
-        hidx, widx, tidx = np.where(np.sum(im, axis = 3) > 0.001)
-        im = im[hidx.min():hidx.max(),
-                widx.min():widx.max(),
-                tidx.min():tidx.max(), :]
+    # if occupancy:
+    #     hidx, widx, tidx = np.where(np.mean(im, axis = 3) > 0.00005)
+    #     im = im[hidx.min():hidx.max(),
+    #             widx.min():widx.max(),
+    #             tidx.min():tidx.max(), :]
     
     print(im.shape)
     H, W, T, L = im.shape
@@ -101,8 +102,8 @@ if __name__ == '__main__':
     y = np.linspace(-1,1,W)
     z = np.linspace(-1,1,T)
     colors = np.reshape(im,[H*W*T,L])
-    inds = np.sum(colors, axis = 1) > 0.01
-    out_inds = np.sum(colors, axis = 1) <= 0.01
+    inds = np.mean(colors, axis = 1) > 0.0002
+    out_inds = np.sum(colors, axis = 1) <= 0.0002
     colors = colors[inds,:]
 
     [X,Y,Z] = np.meshgrid(x,y,z,indexing='ij')
@@ -241,15 +242,21 @@ if __name__ == '__main__':
     mse_array = mse_array[indices]
 
     
-    spetcral_img_gt= get_spectral_proj(im) / 2
-    plt.imshow(spetcral_img_gt[:,:,[26,16,6]])
+    spectral_img_gt= get_spectral_proj(im) / 2
+    if L > 30:
+        plt.imshow(spectral_img_gt[:,:,[26,16,6]])
+    else:
+        plt.imshow(spectral_img_gt[:,:,:])
     plt.savefig('results/%s/%s_gt.png'%(expname, nonlin))
     plt.close()
-    spetcral_img_estim= get_spectral_proj(best_img) / 2
-    plt.imshow(spetcral_img_estim[:,:,[26,16,6]])
+    spectral_img_estim= get_spectral_proj(best_img) / 2
+    if L > 30:
+        plt.imshow(spectral_img_estim[:,:,[26,16,6]])
+    else:
+        plt.imshow(spectral_img_estim[:,:,:])
     plt.savefig('results/%s/%s_estim.png'%(expname, nonlin))
     plt.close()
-    print('img PSNR: ', 10*np.log10(np.max(spetcral_img_gt) / np.mean((spetcral_img_gt - spetcral_img_estim) ** 2)))
+    print('img PSNR: ', 10*np.log10(np.max(spectral_img_gt) / np.mean((spectral_img_gt - spectral_img_estim) ** 2)))
     # ind1 = best_img.reshape(H*W,T,L)[:,,L]
     # ind2 = im.reshape(H*W,T,L)[:,(np.argmax((np.sum(im, axis = 3)).reshape(-1, T), axis = 1)),:]
 
