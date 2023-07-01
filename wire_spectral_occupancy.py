@@ -66,7 +66,7 @@ if __name__ == '__main__':
 
 
     spectral_img = io.loadmat('data/chrac_spectral.mat')['img'].astype(np.float32)
-    spectral_img = spectral_img[:,:,[26,16,6]]
+    # spectral_img = spectral_img[:,:,[26,16,6]]
     depth = ndimage.zoom(depth, [0.1,0.1], order=0, mode='nearest')
     spectral_img = ndimage.zoom(spectral_img, [0.1,0.1,1.0], order=0, mode='nearest')
 
@@ -125,7 +125,7 @@ if __name__ == '__main__':
 
     im = im / np.mean(colors) * 1
 
-    # im = im.sum(axis = 3)
+    # im = im.sum(axis = 3)[...,None]
     # im[im > 0.001] = 1
     # L = 1
     
@@ -171,6 +171,8 @@ if __name__ == '__main__':
     tbar = tqdm.tqdm(range(niters))
     
     im_estim = torch.zeros((H*W*T, L), device='cuda')
+    im_mask = torch.rand(H*W*T,L, device='cuda') > 0.9
+    im_mask[5000:6000,:] = True
     
     tic = time.time()
     print('Running %s nonlinearity'%nonlin)
@@ -182,13 +184,14 @@ if __name__ == '__main__':
         for b_idx in range(0, H*W*T, maxpoints):
             b_indices = indices[b_idx:min(H*W*T, b_idx+maxpoints)]
             b_coords = coords[b_indices, ...].cuda()
+            b_mask = im_mask[b_indices, ...]
             b_indices = b_indices.cuda()
             pixelvalues = model(b_coords[None, ...]).squeeze(axis = 0)
             
             with torch.no_grad():
                 im_estim[b_indices, :] = pixelvalues
         
-            loss = criterion(pixelvalues, imten[b_indices, :])
+            loss = criterion(pixelvalues * b_mask, imten[b_indices, :] * b_mask)
             
             optim.zero_grad()
             loss.backward()
