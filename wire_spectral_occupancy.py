@@ -88,11 +88,11 @@ if __name__ == '__main__':
 
     
     # If the volume is an occupancy, clip to tightest bounding box
-    # if occupancy:
-    #     hidx, widx, tidx = np.where(np.sum(im, axis = 3) > 0.001)
-    #     im = im[hidx.min():hidx.max(),
-    #             widx.min():widx.max(),
-    #             tidx.min():tidx.max(), :]
+    if occupancy:
+        hidx, widx, tidx = np.where(np.sum(im, axis = 3) > 0.001)
+        im = im[hidx.min():hidx.max(),
+                widx.min():widx.max(),
+                tidx.min():tidx.max(), :]
     
     print(im.shape)
     H, W, T, L = im.shape
