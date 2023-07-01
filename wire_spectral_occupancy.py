@@ -225,8 +225,14 @@ if __name__ == '__main__':
         # psnrval = -10*np.log10(mse_array[idx])
         # tbar.set_description('%.1f'%psnrval)
         # tbar.refresh()
+
+
+        spectral_img_gt = get_spectral_proj(imten.detach().cpu().numpy().reshape(H,W,T,L))
+        spectral_img_estim = get_spectral_proj(im_estim.detach().cpu().numpy().reshape(H,W,T,L))
+        img_psnrval = -10*np.log10(np.mean((spectral_img_gt - spectral_img_estim) ** 2) / np.max(spectral_img_gt))
+
         positive_psnrval = -10*torch.log10(torch.mean((imten - im_estim) ** 2) / torch.max(imten))
-        tbar.set_description('%.1f'%positive_psnrval)
+        tbar.set_description('%.1f, %.1f'%(positive_psnrval, img_psnrval))
         tbar.refresh()
         
     total_time = time.time() - tic
