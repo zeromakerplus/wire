@@ -39,7 +39,7 @@ if __name__ == '__main__':
     niters = 5000               # Number of SGD iterations
     learning_rate = 1e-3        # Learning rate 
     expname = 'thai_statue'     # Volume to load
-    scale = 1.0                 # Run at lower scales to testing, default 1.0
+    scale = 0.2                 # Run at lower scales to testing, default 1.0
     mcubes_thres = 0.5          # Threshold for marching cubes
     
     # Gabor filter constants
@@ -67,8 +67,8 @@ if __name__ == '__main__':
 
     spectral_img = io.loadmat('data/chrac_spectral.mat')['img'].astype(np.float32)
     # spectral_img = spectral_img[:,:,[26,16,6]]
-    depth = ndimage.zoom(depth, [0.1,0.1], order=0, mode='nearest')
-    spectral_img = ndimage.zoom(spectral_img, [0.1,0.1,1.0], order=0, mode='nearest')
+    depth = ndimage.zoom(depth, [scale,scale], order=0, mode='nearest')
+    spectral_img = ndimage.zoom(spectral_img, [scale,scale,1.0], order=0, mode='nearest')
 
     N = depth.shape[0]
     L = spectral_img.shape[2]
@@ -85,7 +85,7 @@ if __name__ == '__main__':
                 im[i,j,ind] = spectral_img[i,j,:]
 
 
-    im = ndimage.zoom(im/im.max(), [scale, scale, scale, 1.0], order=0,mode='nearest')
+    im = ndimage.zoom(im/im.max(), [1.0, 1.0, 1.0, 1.0], order=0,mode='nearest')
 
     
     # If the volume is an occupancy, clip to tightest bounding box
@@ -172,7 +172,7 @@ if __name__ == '__main__':
     
     im_estim = torch.zeros((H*W*T, L), device='cuda')
     im_mask = torch.rand(H*W*T,L, device='cuda') > 0.9
-    # im_mask[:,:] = True
+    im_mask[:,:] = True
     
     tic = time.time()
     print('Running %s nonlinearity'%nonlin)
