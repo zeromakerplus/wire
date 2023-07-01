@@ -125,9 +125,9 @@ if __name__ == '__main__':
 
     im = im / np.mean(colors) * 1
 
-    # im = im.sum(axis = 3)[...,None]
-    # im[im > 0.001] = 1
-    # L = 1
+    im = im.sum(axis = 3)[...,None]
+    im[im > 0.001] = 1
+    L = 1
     
     maxpoints = min(H*W*T, maxpoints)
         
