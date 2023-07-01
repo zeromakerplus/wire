@@ -24,9 +24,19 @@ from modules import models
 from modules import utils
 from modules import volutils
 
+
+def get_spectral_proj(img):
+    [H,W,T,L] = img.shape
+    ind = np.argmax((np.sum(img, axis = 3)), axis = 2)
+    spectral_img = np.zeros([H,W,L])
+    for i in range(H):
+        for j in range(W):
+            spectral_img[i,j,:] = img[i,j,ind[i,j],:]
+    return spectral_img
+
 if __name__ == '__main__':
     nonlin = 'wire' # type of nonlinearity, 'wire', 'siren', 'mfn', 'relu', 'posenc', 'gauss'
-    niters = 2000                # Number of SGD iterations
+    niters = 2                # Number of SGD iterations
     learning_rate = 5e-3        # Learning rate 
     expname = 'thai_statue'     # Volume to load
     scale = 1.0                 # Run at lower scales to testing, default 1.0
@@ -52,12 +62,12 @@ if __name__ == '__main__':
 
     depth = cv2.imread('./data/depth.hdr', flags=cv2.IMREAD_ANYDEPTH)
     depth = depth[:,:,0]
-    depth = depth - 5
+    depth = depth / np.max(depth) * 2 - 1 + 0.1
 
 
     spetcral_img = io.loadmat('data/chrac_spectral.mat')['img'].astype(np.float32)
-    depth = ndimage.zoom(depth, [0.1,0.1], order=0)
-    spetcral_img = ndimage.zoom(spetcral_img, [0.1,0.1,1.0], order=0)
+    depth = ndimage.zoom(depth, [0.1,0.1], order=0, mode='nearest')
+    spetcral_img = ndimage.zoom(spetcral_img, [0.1,0.1,1.0], order=0, mode='nearest')
 
     N = depth.shape[0]
     L = spetcral_img.shape[2]
@@ -70,11 +80,11 @@ if __name__ == '__main__':
             ind = int((depth[i,j] - z[0]) / (z[1] - z[0]))
             ind = ind if ind < N else N-1
             ind = ind if ind > 0 else 0
-            if depth[i,j] < 0.9:
+            if depth[i,j] < 1.0:
                 im[i,j,ind] = spetcral_img[i,j,:]
 
 
-    im = ndimage.zoom(im/im.max(), [scale, scale, scale, 1.0], order=0)
+    im = ndimage.zoom(im/im.max(), [scale, scale, scale, 1.0], order=0,mode='nearest')
 
     
     # If the volume is an occupancy, clip to tightest bounding box
@@ -229,7 +239,20 @@ if __name__ == '__main__':
     indices, = np.where(time_array > 0)
     time_array = time_array[indices]
     mse_array = mse_array[indices]
+
     
+    spetcral_img_gt= get_spectral_proj(im) / 2
+    plt.imshow(spetcral_img_gt[:,:,[26,16,6]])
+    plt.savefig('results/%s/%s_gt.png'%(expname, nonlin))
+    plt.close()
+    spetcral_img_estim= get_spectral_proj(best_img) / 2
+    plt.imshow(spetcral_img_estim[:,:,[26,16,6]])
+    plt.savefig('results/%s/%s_estim.png'%(expname, nonlin))
+    plt.close()
+    print('img PSNR: ', 10*np.log10(np.max(spetcral_img_gt) / np.mean((spetcral_img_gt - spetcral_img_estim) ** 2)))
+    # ind1 = best_img.reshape(H*W,T,L)[:,,L]
+    # ind2 = im.reshape(H*W,T,L)[:,(np.argmax((np.sum(im, axis = 3)).reshape(-1, T), axis = 1)),:]
+
     mdict = {'mse_array': mse_array,
              'best_img': best_img,
              'img': im,
