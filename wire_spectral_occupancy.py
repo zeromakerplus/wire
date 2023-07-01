@@ -36,7 +36,7 @@ def get_spectral_proj(img):
 
 if __name__ == '__main__':
     nonlin = 'wire' # type of nonlinearity, 'wire', 'siren', 'mfn', 'relu', 'posenc', 'gauss'
-    niters = 2000               # Number of SGD iterations
+    niters = 5000               # Number of SGD iterations
     learning_rate = 5e-3        # Learning rate 
     expname = 'thai_statue'     # Volume to load
     scale = 1.0                 # Run at lower scales to testing, default 1.0
@@ -50,7 +50,7 @@ if __name__ == '__main__':
     # Network constants
     hidden_layers = 2       # Number of hidden layers in the mlp
     hidden_features = 256   # Number of hidden units per layer
-    maxpoints = int(2e4)    # Batch size, default 2e5
+    maxpoints = int(2e5)    # Batch size, default 2e5
     
     if expname == 'thai_statue':
         occupancy = True
