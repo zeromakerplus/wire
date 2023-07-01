@@ -36,7 +36,7 @@ def get_spectral_proj(img):
 
 if __name__ == '__main__':
     nonlin = 'wire' # type of nonlinearity, 'wire', 'siren', 'mfn', 'relu', 'posenc', 'gauss'
-    niters = 2000                # Number of SGD iterations
+    niters = 2000               # Number of SGD iterations
     learning_rate = 5e-3        # Learning rate 
     expname = 'thai_statue'     # Volume to load
     scale = 1.0                 # Run at lower scales to testing, default 1.0
@@ -88,11 +88,11 @@ if __name__ == '__main__':
 
     
     # If the volume is an occupancy, clip to tightest bounding box
-    if occupancy:
-        hidx, widx, tidx = np.where(np.sum(im, axis = 3) > 0.001)
-        im = im[hidx.min():hidx.max(),
-                widx.min():widx.max(),
-                tidx.min():tidx.max(), :]
+    # if occupancy:
+    #     hidx, widx, tidx = np.where(np.sum(im, axis = 3) > 0.001)
+    #     im = im[hidx.min():hidx.max(),
+    #             widx.min():widx.max(),
+    #             tidx.min():tidx.max(), :]
     
     print(im.shape)
     H, W, T, L = im.shape
