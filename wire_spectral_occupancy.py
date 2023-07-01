@@ -172,7 +172,7 @@ if __name__ == '__main__':
     
     im_estim = torch.zeros((H*W*T, L), device='cuda')
     im_mask = torch.rand(H*W*T,L, device='cuda') > 0.9
-    im_mask[5000:6000,:] = True
+    # im_mask[5000:6000,:] = True
     
     tic = time.time()
     print('Running %s nonlinearity'%nonlin)
