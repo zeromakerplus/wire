@@ -36,7 +36,7 @@ def get_spectral_proj(img):
 
 if __name__ == '__main__':
     nonlin = 'wire' # type of nonlinearity, 'wire', 'siren', 'mfn', 'relu', 'posenc', 'gauss'
-    niters = 20000               # Number of SGD iterations
+    niters = 5000               # Number of SGD iterations
     learning_rate = 5e-3        # Learning rate 
     expname = 'thai_statue'     # Volume to load
     scale = 1.0                 # Run at lower scales to testing, default 1.0
@@ -66,7 +66,7 @@ if __name__ == '__main__':
 
 
     spectral_img = io.loadmat('data/chrac_spectral.mat')['img'].astype(np.float32)
-    spectral_img = spectral_img[:,:,[26,16,6]]
+    # spectral_img = spectral_img[:,:,[26,16,6]]
     depth = ndimage.zoom(depth, [0.1,0.1], order=0, mode='nearest')
     spectral_img = ndimage.zoom(spectral_img, [0.1,0.1,1.0], order=0, mode='nearest')
 
