@@ -206,7 +206,7 @@ if __name__ == '__main__':
 
     tbar = tqdm.tqdm(range(niters))
 
-    patchsize = 1
+    patchsize = 16
     Ls = L
     L = patchsize ** 3 * Ls
     im_block, h, w, t = patchify(imten.reshape(1,H,W,T,Ls).permute([0,4,1,2,3]), patchsize = patchsize)
