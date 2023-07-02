@@ -28,34 +28,36 @@ from modules import volutils
 def patchify(imgs, patchsize):
     # Borrowed from mask auto encoder(MAE)
     """
-    imgs: (N, L, H, W)
-    x: (N, num, patch_size, patch_size, L)
+    imgs: (N, L, H, W, T)
+    x: (N, num, patch_size, patch_size, patchsize, L)
     """
     p = patchsize
     L = imgs.shape[1]
-    assert imgs.shape[2] == imgs.shape[3] and imgs.shape[2] % p == 0
+    # assert imgs.shape[2] == imgs.shape[3] and imgs.shape[2] % p == 0
 
-    h = w = imgs.shape[2] // p
-    x = imgs.reshape(imgs.shape[0], L, h, p, w, p)
-    x = torch.einsum('nchpwq->nhwpqc', x)
-    # x = x.reshape(imgs.shape[0], h * w, p**2 * 1)
-    x = x.reshape(imgs.shape[0], h * w, p, p, L)
-    return x
+    h = imgs.shape[2] // p
+    w = imgs.shape[3] // p
+    t = imgs.shape[4] // p
+    x = imgs.reshape(imgs.shape[0], L, h, p, w, p, t, p)
+    x = torch.einsum('nchpwqtr->nhwtpqrc', x)
+    x = x.reshape(imgs.shape[0], h * w * t, p, p, p, L)
+    return x, h, w, t
 
-def unpatchify(x, patchsize):
+def unpatchify(x, patchsize, hwt):
     # Borrowed from mask auto encoder(MAE)
     """
-    x: (N, num, patch_size, patch_size, L)
-    imgs: (N, L, H, W)
+    x: (N, num, patch_size, patch_size, patchsize, L)
+    imgs: (N, L, H, W, T)
     """
     p = patchsize
     L = x.shape[-1]
-    h = w = int(x.shape[1]**.5)
-    assert h * w == x.shape[1]
+    [h, w, t] = hwt
+    # h = w = int(x.shape[1]**.5)
+    # assert h * w == x.shape[1]
     
-    x = x.reshape(shape=(x.shape[0], h, w, p, p, L))
-    x = torch.einsum('nhwpqc->nchpwq', x)
-    imgs = x.reshape(x.shape[0], L, h * p, h * p)
+    x = x.reshape(shape=(x.shape[0], h, w, t, p, p, p, L))
+    x = torch.einsum('nhwtpqrc->nchpwqtr', x)
+    imgs = x.reshape(x.shape[0], L, h * p, w * p, t * p)
     return imgs
     
 
@@ -203,29 +205,45 @@ if __name__ == '__main__':
     best_img = None
 
     tbar = tqdm.tqdm(range(niters))
+
+    patchsize = 16
+    Ls = L
+    L = patchsize ** 3 * Ls
+    im_block, h, w, t = patchify(imten.reshape(1,H,W,T,Ls).permute([0,4,1,2,3]), patchsize = patchsize)
+    num_block = im_block.shape[1]
+    im_block = im_block.squeeze(axis = 0).reshape(num_block, L)
     
-    im_estim = torch.zeros((H*W*T, L), device='cuda')
-    im_mask = torch.rand(H*W*T,L, device='cuda') > 0.95
-    # im_mask[:,:] = True
+    coords_block, _, _, _ = patchify(coords.reshape(1,H,W,T,3).permute([0,4,1,2,3]), patchsize = patchsize)
+    coords_block = coords_block.squeeze(axis = 0).reshape(num_block, patchsize ** 3 * 3)
+    im_estim = torch.zeros((H*W*T, Ls), device='cuda')
+    im_estim_block, _, _, _ = patchify(im_estim.reshape(1,H,W,T,Ls).permute([0,4,1,2,3]), patchsize = patchsize)
+    im_estim_block = im_estim_block.squeeze(axis = 0).reshape(num_block, L)
+    im_mask = torch.rand(H*W*T,Ls, device='cuda') > 0.95
+    im_mask_block, _, _, _ = patchify(im_mask.reshape(1,H,W,T,Ls).permute([0,4,1,2,3]), patchsize = patchsize)
+    im_mask_block = im_mask_block.squeeze(axis = 0).reshape(num_block, L)
+
+    im_mask[:,:] = True
     
     tic = time.time()
     print('Running %s nonlinearity'%nonlin)
     for idx in tbar:
-        indices = torch.randperm(H*W*T)
+        indices = torch.randperm(num_block)
         
         train_loss = 0
         nchunks = 0
-        for b_idx in range(0, H*W*T, maxpoints):
-            b_indices = indices[b_idx:min(H*W*T, b_idx+maxpoints)]
-            b_coords = coords[b_indices, ...].cuda()
-            b_mask = im_mask[b_indices, ...]
+        for b_idx in range(0, num_block, maxpoints):
+            b_indices = indices[b_idx:min(num_block, b_idx+maxpoints)]
+            num_block_temp = b_indices.shape[0]
+            b_coords = coords_block[b_indices, ...].cuda()
+            b_mask = im_mask_block[b_indices, ...]
             b_indices = b_indices.cuda()
-            pixelvalues = model(b_coords[None, ...]).squeeze(axis = 0)
+            pixelvalues = model(b_coords[None, ...].reshape(num_block_temp * patchsize ** 3, 3)).squeeze(axis = 0)
+            pixelvalues = pixelvalues.reshape(num_block_temp, patchsize ** 3 * Ls)
             
             with torch.no_grad():
-                im_estim[b_indices, :] = pixelvalues
+                im_estim_block[b_indices, :] = pixelvalues
         
-            loss = criterion(pixelvalues * b_mask, imten[b_indices, :] * b_mask)
+            loss = criterion(pixelvalues * b_mask, im_block[b_indices, :] * b_mask)
             
             optim.zero_grad()
             loss.backward()
@@ -243,11 +261,15 @@ if __name__ == '__main__':
         time_array[idx] = time.time()
         scheduler.step()
         
-        im_estim_vol = im_estim.reshape(H, W, T, L)
+
+        im_estim_vol = unpatchify(im_estim_block.reshape(1, num_block, patchsize, patchsize, patchsize, Ls), patchsize = patchsize, hwt = [h,w,t])
+        im_estim_vol = im_estim_vol.squeeze(axis = 0).permute([1,2,3,0])
+        #
+        #  .reshape(H, W, T, L)
         
         if lossval < best_mse:
             best_mse = lossval
-            best_img = copy.deepcopy(im_estim)
+            best_img = copy.deepcopy(im_estim_vol)
 
         # if sys.platform == 'win32':
         #     cv2.imshow('GT', im[..., idx%T])
@@ -260,19 +282,24 @@ if __name__ == '__main__':
         # tbar.set_description('%.1f'%psnrval)
         # tbar.refresh()
 
+        im_vol = unpatchify(im_block.reshape(1, num_block, patchsize, patchsize, patchsize, Ls), patchsize = patchsize, hwt = [h,w,t])
+        im_vol = im_vol.squeeze(axis = 0).permute([1,2,3,0])
+        im_estim_vol = unpatchify(im_estim_block.reshape(1, num_block, patchsize, patchsize, patchsize, Ls), patchsize = patchsize, hwt = [h,w,t])
+        im_estim_vol = im_estim_vol.squeeze(axis = 0).permute([1,2,3,0])
 
-        spectral_img_gt = get_spectral_proj(imten.detach().cpu().numpy().reshape(H,W,T,L))
-        spectral_img_estim = get_spectral_proj(im_estim.detach().cpu().numpy().reshape(H,W,T,L))
+
+        spectral_img_gt = get_spectral_proj(im_vol.detach().cpu().numpy().reshape(H,W,T,Ls))
+        spectral_img_estim = get_spectral_proj(im_estim_vol.detach().cpu().numpy().reshape(H,W,T,Ls))
         img_psnrval = -10*np.log10(np.mean((spectral_img_gt - spectral_img_estim) ** 2) / np.max(spectral_img_gt))
 
-        positive_psnrval = -10*torch.log10(torch.mean((imten - im_estim) ** 2) / torch.max(imten))
+        positive_psnrval = -10*torch.log10(torch.mean((im_block - im_estim_block) ** 2) / torch.max(im_block))
         tbar.set_description('%.1f, %.1f'%(positive_psnrval, img_psnrval))
         tbar.refresh()
         
     total_time = time.time() - tic
     nparams = utils.count_parameters(model)
     
-    best_img = best_img.reshape(H, W, T, L).detach().cpu().numpy()
+    best_img = best_img.reshape(H, W, T, Ls).detach().cpu().numpy()
     
     if posencode:
         nonlin = 'posenc'
@@ -286,14 +313,14 @@ if __name__ == '__main__':
 
     
     spectral_img_gt= get_spectral_proj(im) / 2
-    if L > 30:
+    if Ls > 30:
         plt.imshow(spectral_img_gt[:,:,[26,16,6]])
     else:
         plt.imshow(spectral_img_gt[:,:,:])
     plt.savefig('results/%s/%s_gt.png'%(expname, nonlin))
     plt.close()
     spectral_img_estim= get_spectral_proj(best_img) / 2
-    if L > 30:
+    if Ls > 30:
         plt.imshow(spectral_img_estim[:,:,[26,16,6]])
     else:
         plt.imshow(spectral_img_estim[:,:,:])
