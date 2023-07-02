@@ -171,8 +171,8 @@ if __name__ == '__main__':
     tbar = tqdm.tqdm(range(niters))
     
     im_estim = torch.zeros((H*W*T, L), device='cuda')
-    im_mask = torch.rand(H*W*T,L, device='cuda') > 0.9
-    im_mask[:,:] = True
+    im_mask = torch.rand(H*W*T,L, device='cuda') > 0.7
+    # im_mask[:,:] = True
     
     tic = time.time()
     print('Running %s nonlinearity'%nonlin)
