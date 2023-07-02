@@ -206,7 +206,7 @@ if __name__ == '__main__':
 
     tbar = tqdm.tqdm(range(niters))
 
-    patchsize = 16
+    patchsize = 8
     Ls = L
     L = patchsize ** 3 * Ls
     im_block, h, w, t = patchify(imten.reshape(1,H,W,T,Ls).permute([0,4,1,2,3]), patchsize = patchsize)
@@ -243,9 +243,12 @@ if __name__ == '__main__':
             with torch.no_grad():
                 im_estim_block[b_indices, :] = pixelvalues
         
-            loss_lowrank = torch.linalg.matrix_norm(pixelvalues.reshape(num_block_temp, patchsize ** 3, Ls),'nuc',[1,2],True)
-            loss = criterion(pixelvalues * b_mask, im_block[b_indices, :] * b_mask) + 1e-8 * torch.mean(loss_lowrank)
             
+            loss = criterion(pixelvalues * b_mask, im_block[b_indices, :] * b_mask) 
+            if idx > 1000:
+                loss_lowrank = torch.linalg.matrix_norm(pixelvalues.reshape(num_block_temp, patchsize ** 3, Ls), 'nuc', [1,2], True)
+                loss += 1e-8 * torch.mean(loss_lowrank)
+
             optim.zero_grad()
             loss.backward()
             optim.step()
