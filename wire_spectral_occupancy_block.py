@@ -222,7 +222,7 @@ if __name__ == '__main__':
     im_mask_block, _, _, _ = patchify(im_mask.reshape(1,H,W,T,Ls).permute([0,4,1,2,3]), patchsize = patchsize)
     im_mask_block = im_mask_block.squeeze(axis = 0).reshape(num_block, L)
 
-    im_mask_block[:,:] = True
+    # im_mask_block[:,:] = True
     
     tic = time.time()
     print('Running %s nonlinearity'%nonlin)
@@ -243,7 +243,8 @@ if __name__ == '__main__':
             with torch.no_grad():
                 im_estim_block[b_indices, :] = pixelvalues
         
-            loss = criterion(pixelvalues * b_mask, im_block[b_indices, :] * b_mask)
+            loss_lowrank = torch.linalg.matrix_norm(pixelvalues.reshape(num_block_temp, patchsize ** 3, Ls),'nuc',[1,2],True)
+            loss = criterion(pixelvalues * b_mask, im_block[b_indices, :] * b_mask) + 0.0 * torch.mean(loss_lowrank)
             
             optim.zero_grad()
             loss.backward()
