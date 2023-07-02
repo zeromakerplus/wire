@@ -222,7 +222,7 @@ if __name__ == '__main__':
     im_mask_block, _, _, _ = patchify(im_mask.reshape(1,H,W,T,Ls).permute([0,4,1,2,3]), patchsize = patchsize)
     im_mask_block = im_mask_block.squeeze(axis = 0).reshape(num_block, L)
 
-    im_mask[:,:] = True
+    im_mask_block[:,:] = True
     
     tic = time.time()
     print('Running %s nonlinearity'%nonlin)
