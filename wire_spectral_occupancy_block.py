@@ -244,7 +244,7 @@ if __name__ == '__main__':
                 im_estim_block[b_indices, :] = pixelvalues
         
             loss_lowrank = torch.linalg.matrix_norm(pixelvalues.reshape(num_block_temp, patchsize ** 3, Ls),'nuc',[1,2],True)
-            loss = criterion(pixelvalues * b_mask, im_block[b_indices, :] * b_mask) + 1.0 * torch.mean(loss_lowrank)
+            loss = criterion(pixelvalues * b_mask, im_block[b_indices, :] * b_mask) + 0.1 * torch.mean(loss_lowrank)
             
             optim.zero_grad()
             loss.backward()
