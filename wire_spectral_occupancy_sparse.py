@@ -109,7 +109,7 @@ if __name__ == '__main__':
     for i in range(spectral_dict.shape[0]):
         spectral_dict[i,:] = spectral_img[spectral_dict_ind[i][0],spectral_dict_ind[i][1],:]
     spectral_dict = spectral_dict * 500
-    spectral_dict = torch.from_numpy(spectral_dict).float().to(device)
+    spectral_dict = torch.from_numpy(spectral_dict).float().to('cuda')
     Lf = spectral_dict.shape[0]
 
     N = depth.shape[0]
