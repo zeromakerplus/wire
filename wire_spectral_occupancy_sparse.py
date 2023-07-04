@@ -69,7 +69,7 @@ def get_spectral_proj(img):
     return spectral_img
 
 if __name__ == '__main__':
-    nonlin = 'wire' # type of nonlinearity, 'wire', 'siren', 'mfn', 'relu', 'posenc', 'gauss'
+    nonlin = 'siren' # type of nonlinearity, 'wire', 'siren', 'mfn', 'relu', 'posenc', 'gauss'
     niters = 5000               # Number of SGD iterations
     learning_rate = 1e-3        # Learning rate 
     expname = 'thai_statue'     # Volume to load
