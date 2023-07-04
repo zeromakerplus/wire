@@ -185,7 +185,7 @@ if __name__ == '__main__':
     model = models.get_INR(
                     nonlin=nonlin,
                     in_features=3,
-                    out_features=Lf, 
+                    out_features=L, 
                     hidden_features=hidden_features,
                     hidden_layers=hidden_layers,
                     first_omega_0=omega0,
@@ -229,7 +229,7 @@ if __name__ == '__main__':
             b_mask = im_mask[b_indices, ...]
             b_indices = b_indices.cuda()
             pixelvalues = model(b_coords[None, ...]).squeeze(axis = 0)
-            pixelvalues = pixelvalues @ spectral_dict
+            # pixelvalues = pixelvalues @ spectral_dict
             
             with torch.no_grad():
                 im_estim[b_indices, :] = pixelvalues
